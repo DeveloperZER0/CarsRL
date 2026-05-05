@@ -1,58 +1,96 @@
 using UnityEngine;
 
 /// <summary>
-/// Prosty kontroler ruchu auta bez WheelCollider.
-/// Steruje calym obiektem (Rigidbody) na podstawie wejsc: predkosc i skret.
+/// Kontroler auta oparty na WheelColliderach.
 ///
 /// SETUP W UNITY:
-/// 1. Dodaj ten skrypt do GameObject z Rigidbody
-/// 2. Dodaj collider do karoserii (np. BoxCollider)
+/// 1. Główny GameObject: Rigidbody + ten skrypt
+/// 2. Utwórz 4 puste child GameObject'y jako "koła fizyczne" (WheelColliders)
+///    np: WheelFL, WheelFR, WheelRL, WheelRR
+/// 3. Każdy z nich dostaje komponent WheelCollider
+/// 4. Utwórz 4 child GameObject'y jako "koła wizualne" (meshe kół)
+/// 5. Przypisz wszystko w Inspectorze
+///
+/// USTAWIENIA WHEELCOLLIDER (każde koło):
+///  Mass:            20
+///  Radius:          dopasuj do rozmiaru koła (np. 0.35)
+///  Suspension Distance: 0.15
+///  Spring: Spring: 25000, Damper: 2500, Target Position: 0.3
+///  Forward Friction:  Extremum Slip 0.4 / Value 1.0 | Asymptote Slip 0.8 / Value 0.5 | Stiffness 1.5
+///  Sideways Friction: Extremum Slip 0.2 / Value 1.0 | Asymptote Slip 0.5 / Value 0.7 | Stiffness 2.0
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class CarController : MonoBehaviour
 {
-    [Header("Car Physics")]
-    [Tooltip("Maksymalna predkosc ruchu (m/s)")]
-    public float maxSpeed = 12f;
+    // ─── Wheel References ─────────────────────────────────────────────────────
 
-    [Tooltip("Predkosc skretu (stopnie na sekunde)")]
-    public float steeringSpeed = 120f;
+    [Header("Wheel Colliders")]
+    public WheelCollider wheelFL;
+    public WheelCollider wheelFR;
+    public WheelCollider wheelRL;
+    public WheelCollider wheelRR;
 
-    [Tooltip("Obniżenie środka ciężkości (zapobiega przewracaniu)")]
-    public float centerOfMassOffset = -0.5f;
+    [Header("Wheel Meshes (Visual)")]
+    public Transform meshFL;
+    public Transform meshFR;
+    public Transform meshRL;
+    public Transform meshRR;
 
-    [Header("Grounding")]
-    [Tooltip("Warstwy uznawane za podloze")]
-    public LayerMask groundLayers = ~0;
+    [Header("Wheel Mesh Offsets")]
+public Vector3 leftWheelOffset  = new Vector3(0f, 90f, 0f);
+public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
-    [Tooltip("Start raycastu nad ziemia (m)")]
-    public float groundCheckOffset = 0.5f;
+    // ─── Engine ───────────────────────────────────────────────────────────────
 
-    [Tooltip("Maksymalny zasieg sprawdzania podloza (m)")]
-    public float groundCheckDistance = 1.2f;
+    [Header("Engine")]
+    [Tooltip("Maksymalny moment obrotowy silnika [Nm]")]
+    public float motorTorque = 1500f;
 
-    [Tooltip("Jak szybko dopasowac obrot do normalnej podloza")]
-    public float groundAlignSpeed = 12f;
+    [Tooltip("Moment hamowania [Nm]")]
+    public float brakeTorque = 3000f;
 
-    [Tooltip("Dodatkowy docisk do podloza (m/s^2)")]
-    public float downforce = 30f;
+    [Tooltip("Hamowanie silnikiem gdy brak gazu [Nm]")]
+    public float engineBrakeTorque = 300f;
+
+    [Tooltip("Maksymalna prędkość [m/s]")]
+    public float maxSpeed = 15f;
+
+    // ─── Steering ─────────────────────────────────────────────────────────────
+
+    [Header("Steering")]
+    [Tooltip("Maksymalny kąt skrętu kół przednich [°]")]
+    public float maxSteeringAngle = 30f;
+
+    [Tooltip("Prędkość interpolacji skrętu (płynność)")]
+    public float steeringSpeed = 5f;
+
+    // ─── Physics ──────────────────────────────────────────────────────────────
+
+    [Header("Physics")]
+
+    [Tooltip("Docisk do podłoża rośnie z prędkością [N/(m/s)]")]
+    public float downforcePerSpeed = 10f;
+
+    // ─── Internals ────────────────────────────────────────────────────────────
 
     private Rigidbody _rb;
     private float _currentSteer;
     private float _currentThrottle;
+    private float _steerTarget;
     private Vector3 _startPosition;
     private Quaternion _startRotation;
-    private bool _isGrounded;
-    private Vector3 _groundNormal = Vector3.up;
 
-    // ─── Unity Lifecycle ───────────────────────────────────────────────────────
+    // Publiczne właściwości do odczytu (ML-Agents / UI)
+    public float SpeedMs       => _rb.linearVelocity.magnitude;
+    public float SpeedKmH      => SpeedMs * 3.6f;
+    public bool  IsGrounded    => wheelRL.isGrounded || wheelRR.isGrounded;
+
+    // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();
-
-        // Obniżenie środka masy - kluczowe dla stabilności!
-        // _rb.centerOfMass = new Vector3(0f, centerOfMassOffset, 0f);
+        _rb.interpolation  = RigidbodyInterpolation.Interpolate;
 
         _startPosition = transform.position;
         _startRotation = transform.rotation;
@@ -60,8 +98,10 @@ public class CarController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        UpdateGrounding();
-        ApplyInputs();
+        ApplySteering();
+        ApplyMotor();
+        ApplyDownforce();
+        UpdateWheelMeshes();
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -69,43 +109,38 @@ public class CarController : MonoBehaviour
     /// <summary>
     /// Ustawia wejścia sterowania (wywoływane przez CarAgent).
     /// </summary>
-    /// <param name="steer">-1 = pełny skręt w lewo, +1 = pełny skręt w prawo</param>
-    /// <param name="throttle">-1 = hamowanie/wstecz, +1 = pełny gaz</param>
+    /// <param name="steer">-1 = lewo, +1 = prawo</param>
+    /// <param name="throttle">-1 = hamulec/wsteczny, +1 = gaz</param>
     public void SetInputs(float steer, float throttle)
     {
-        _currentSteer = Mathf.Clamp(steer, -1f, 1f);
+        _currentSteer    = Mathf.Clamp(steer,    -1f, 1f);
         _currentThrottle = Mathf.Clamp(throttle, -1f, 1f);
     }
 
-    /// <summary>
-    /// Zwraca znormalizowaną prędkość (0..1) do obserwacji.
-    /// </summary>
-    public float GetNormalizedSpeed()
-    {
-        return Mathf.Clamp01(_rb.linearVelocity.magnitude / maxSpeed);
-    }
+    public float GetNormalizedSpeed() => Mathf.Clamp01(SpeedMs / maxSpeed);
 
-    /// <summary>
-    /// Reset samochodu do pozycji startowej (wywoływane przez CarAgent.OnEpisodeBegin).
-    /// </summary>
     public void ResetCar()
     {
-        // Stop fizyki
-        _rb.linearVelocity = Vector3.zero;
+        // Wyzeruj siły
+        _rb.linearVelocity  = Vector3.zero;
         _rb.angularVelocity = Vector3.zero;
-
-        // Reset transform
+        _rb.position        = _startPosition;
+        _rb.rotation        = _startRotation;
         transform.SetPositionAndRotation(_startPosition, _startRotation);
 
-        // Reset wejść
-        _currentSteer = 0f;
-        _currentThrottle = 0f;
+        // Wyzeruj WheelCollidery
+        foreach (var wheel in new[] { wheelFL, wheelFR, wheelRL, wheelRR })
+        {
+            wheel.motorTorque  = 0f;
+            wheel.brakeTorque  = 0f;
+            wheel.steerAngle   = 0f;
+        }
 
+        _currentSteer    = 0f;
+        _currentThrottle = 0f;
+        _steerTarget     = 0f;
     }
 
-    /// <summary>
-    /// Aktualizuje pozycję startową (np. gdy Manager wylosuje spawn point).
-    /// </summary>
     public void SetStartTransform(Vector3 pos, Quaternion rot)
     {
         _startPosition = pos;
@@ -114,54 +149,112 @@ public class CarController : MonoBehaviour
 
     // ─── Private Methods ──────────────────────────────────────────────────────
 
-    private void ApplyInputs()
+    private void ApplyMotor()
     {
-        // Ruch do przodu/tylu
-        Vector3 forward = _isGrounded
-            ? Vector3.ProjectOnPlane(transform.forward, _groundNormal).normalized
-            : transform.forward;
-        if (forward.sqrMagnitude < 0.001f)
+        float forwardSpeed = Vector3.Dot(_rb.linearVelocity, transform.forward);
+
+        if (_currentThrottle > 0f)
         {
-            forward = transform.forward;
-        }
-
-        Vector3 move = forward * (_currentThrottle * maxSpeed * Time.fixedDeltaTime);
-        _rb.MovePosition(_rb.position + move);
-
-        // Skret wokol osi Y
-        float turn = _currentSteer * steeringSpeed * Time.fixedDeltaTime;
-        Quaternion turnRot = Quaternion.AngleAxis(turn, _isGrounded ? _groundNormal : Vector3.up);
-        Quaternion targetRot = turnRot * _rb.rotation;
-
-        if (_isGrounded)
-        {
-            Quaternion alignRot = Quaternion.FromToRotation(transform.up, _groundNormal) * targetRot;
-            targetRot = Quaternion.Slerp(_rb.rotation, alignRot, groundAlignSpeed * Time.fixedDeltaTime);
-        }
-
-        _rb.MoveRotation(targetRot);
-    }
-
-    private void UpdateGrounding()
-    {
-        Vector3 origin = transform.position + Vector3.up * groundCheckOffset;
-        float rayLength = groundCheckDistance + groundCheckOffset;
-
-        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, rayLength, groundLayers,
-            QueryTriggerInteraction.Ignore))
-        {
-            _isGrounded = true;
-            _groundNormal = hit.normal;
-
-            if (downforce > 0f)
+            // ── Przyspieszanie ──
+            if (SpeedMs < maxSpeed)
             {
-                _rb.AddForce(-_groundNormal * downforce, ForceMode.Acceleration);
+                // Krzywa momentu: pełna siła do 50% prędkości, potem spada
+                float speedRatio  = Mathf.Clamp01(SpeedMs / maxSpeed);
+                float torqueCurve = Mathf.Pow(1f - speedRatio, 1.5f);
+                float torque      = _currentThrottle * motorTorque * torqueCurve;
+
+                // Napęd na wszystkie koła (4WD)
+                // Zmień na wheelRL/RR jeśli chcesz tylnonapędowe (RWD → więcej driftu!)
+                wheelFL.motorTorque = torque;
+                wheelFR.motorTorque = torque;
+                wheelRL.motorTorque = torque;
+                wheelRR.motorTorque = torque;
+            }
+            else
+            {
+                // Osiągnięto maxSpeed – brak momentu
+                SetMotorTorque(0f);
+            }
+
+            // Brak hamowania
+            SetBrakeTorque(0f);
+        }
+        else if (_currentThrottle < 0f)
+        {
+            SetMotorTorque(0f);
+
+            if (forwardSpeed > 0.5f)
+            {
+                // ── Hamowanie ──
+                SetBrakeTorque(Mathf.Abs(_currentThrottle) * brakeTorque);
+            }
+            else
+            {
+                // ── Wsteczny (tylko tylne koła) ──
+                SetBrakeTorque(0f);
+                wheelRL.motorTorque = _currentThrottle * motorTorque * 0.5f;
+                wheelRR.motorTorque = _currentThrottle * motorTorque * 0.5f;
+                wheelFL.motorTorque = 0f;
+                wheelFR.motorTorque = 0f;
             }
         }
         else
         {
-            _isGrounded = false;
-            _groundNormal = Vector3.up;
+            // ── Hamowanie silnikiem ──
+            SetMotorTorque(0f);
+            SetBrakeTorque(engineBrakeTorque);
         }
+    }
+
+    private void ApplySteering()
+    {
+        // Płynna interpolacja skrętu (bez szarpania)
+        _steerTarget = _currentSteer * maxSteeringAngle;
+        float smoothed = Mathf.Lerp(wheelFL.steerAngle, _steerTarget,
+                                    steeringSpeed * Time.fixedDeltaTime);
+
+        wheelFL.steerAngle = smoothed;
+        wheelFR.steerAngle = smoothed;
+    }
+
+    private void ApplyDownforce()
+    {
+        // Docisk rośnie kwadratowo z prędkością (jak w prawdziwym aucie)
+        float force = downforcePerSpeed * SpeedMs * SpeedMs;
+        _rb.AddForce(-transform.up * force, ForceMode.Force);
+    }
+
+    /// <summary>
+    /// Synchronizuje pozycję i rotację mesha wizualnego z WheelColliderem.
+    /// </summary>
+    private void UpdateWheelMeshes()
+    {
+        UpdateSingleMesh(wheelFL, meshFL, leftWheelOffset);
+        UpdateSingleMesh(wheelFR, meshFR, rightWheelOffset);
+        UpdateSingleMesh(wheelRL, meshRL, leftWheelOffset);
+        UpdateSingleMesh(wheelRR, meshRR, rightWheelOffset);
+    }
+
+    private void UpdateSingleMesh(WheelCollider col, Transform mesh, Vector3 rotationOffset)
+{
+    if (mesh == null) return;
+    col.GetWorldPose(out Vector3 pos, out Quaternion rot);
+    mesh.SetPositionAndRotation(pos, rot * Quaternion.Euler(rotationOffset));
+}
+
+    private void SetMotorTorque(float torque)
+    {
+        wheelFL.motorTorque = torque;
+        wheelFR.motorTorque = torque;
+        wheelRL.motorTorque = torque;
+        wheelRR.motorTorque = torque;
+    }
+
+    private void SetBrakeTorque(float torque)
+    {
+        wheelFL.brakeTorque = torque;
+        wheelFR.brakeTorque = torque;
+        wheelRL.brakeTorque = torque;
+        wheelRR.brakeTorque = torque;
     }
 }

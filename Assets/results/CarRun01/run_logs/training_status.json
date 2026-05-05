@@ -2,24 +2,6 @@
     "CarDriver": {
         "checkpoints": [
             {
-                "steps": 399997,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-399997.onnx",
-                "reward": -8.160235466177172,
-                "creation_time": 1777375828.4907782,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-399997.pt"
-                ]
-            },
-            {
-                "steps": 499953,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-499953.onnx",
-                "reward": 4.699529281029334,
-                "creation_time": 1777376258.480926,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-499953.pt"
-                ]
-            },
-            {
                 "steps": 539263,
                 "file_path": "results/CarRun01/CarDriver/CarDriver-539263.onnx",
                 "reward": 13.161609186697259,
@@ -45,15 +27,33 @@
                 "auxillary_file_paths": [
                     "results/CarRun01/CarDriver/CarDriver-663252.pt"
                 ]
+            },
+            {
+                "steps": 699936,
+                "file_path": "results/CarRun01/CarDriver/CarDriver-699936.onnx",
+                "reward": 5.253090653816859,
+                "creation_time": 1777881788.945467,
+                "auxillary_file_paths": [
+                    "results/CarRun01/CarDriver/CarDriver-699936.pt"
+                ]
+            },
+            {
+                "steps": 797280,
+                "file_path": "results/CarRun01/CarDriver/CarDriver-797280.onnx",
+                "reward": 19.881024049675982,
+                "creation_time": 1777882179.588026,
+                "auxillary_file_paths": [
+                    "results/CarRun01/CarDriver/CarDriver-797280.pt"
+                ]
             }
         ],
         "final_checkpoint": {
-            "steps": 663252,
+            "steps": 797280,
             "file_path": "results/CarRun01/CarDriver.onnx",
-            "reward": 8.88321785926819,
-            "creation_time": 1777380216.1659389,
+            "reward": 19.881024049675982,
+            "creation_time": 1777882179.588026,
             "auxillary_file_paths": [
-                "results/CarRun01/CarDriver/CarDriver-663252.pt"
+                "results/CarRun01/CarDriver/CarDriver-797280.pt"
             ]
         }
     },

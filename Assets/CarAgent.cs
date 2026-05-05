@@ -72,23 +72,20 @@ public class CarAgent : Agent
     /// Reset środowiska na początku każdego epizodu.
     /// </summary>
     public override void OnEpisodeBegin()
+{
+    _episodeTimer = 0f;
+    _stuckTimer = 0f;
+    _nextCheckpointIndex = 0;
+
+    if (checkpointManager != null)
     {
-        _episodeTimer = 0f;
-        _stuckTimer = 0f;
-        _nextCheckpointIndex = 0;
-
-        // Reset pozycji i fizyki samochodu
-        _car.ResetCar();
-
-        // Ustaw pozycję startową z managera
-        if (checkpointManager != null)
-        {
-            Transform spawn = checkpointManager.GetSpawnTransform();
-            transform.SetPositionAndRotation(spawn.position, spawn.rotation);
-        }
-
-        _lastPosition = transform.position;
+        Transform spawn = checkpointManager.GetSpawnTransform();
+        _car.SetStartTransform(spawn.position, spawn.rotation); // ← DODAJ TO
     }
+
+    _car.ResetCar(); // teraz używa poprawnego spawn pointa
+    _lastPosition = transform.position;
+}
 
     /// <summary>
     /// Zbieranie obserwacji dla sieci neuronowej.
@@ -117,7 +114,6 @@ public class CarAgent : Agent
 
             sensor.AddObservation(normalizedDist);
         }
-
         // --- 1 obserwacja: prędkość ---
         float speed = _car.GetNormalizedSpeed();
         sensor.AddObservation(speed);
