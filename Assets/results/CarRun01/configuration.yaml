@@ -3,14 +3,14 @@ behaviors:
   CarDriver:
     trainer_type: ppo
     hyperparameters:
-      batch_size: 512
-      buffer_size: 4096
+      batch_size: 1024
+      buffer_size: 8192
       learning_rate: 0.0003
       learning_rate_schedule: linear
     checkpoint_interval: 100000
     network_settings:
       normalize: true
-      hidden_units: 128
+      hidden_units: 256
       num_layers: 2
       vis_encode_type: simple
       memory: null
@@ -31,8 +31,8 @@ behaviors:
     init_path: null
     keep_checkpoints: 5
     even_checkpoints: false
-    max_steps: 2000000
-    time_horizon: 64
+    max_steps: 5000000
+    time_horizon: 256
     summary_freq: 10000
     threaded: false
     self_play: null
@@ -62,7 +62,7 @@ checkpoint_settings:
   run_id: CarRun01
   initialize_from: null
   load_model: false
-  resume: true
+  resume: false
   force: false
   train_model: false
   inference: false

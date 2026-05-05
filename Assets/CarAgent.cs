@@ -48,6 +48,13 @@ public class CarAgent : Agent
     [Tooltip("Maksymalny czas epizodu w sekundach")]
     public float maxEpisodeTime = 60f;
 
+    [Header("Speed & Style Rewards")]
+public float speedRewardScale    = 0.003f;  // nagroda za szybkość
+public float reversepenalty      = -0.008f; // kara za cofanie
+public float driftRewardScale    = 0.002f;  // nagroda za drift podczas skrętu
+public float minDriftSlip = 0.3f;  // było 1.5 — WheelCollider używa innych jednostek
+public float maxDriftSlip = 0.9f;  // było 5.0
+
     // Kąty raycastów (stopnie, 0 = prosto w przód)
     private readonly float[] _rayAngles = { -80f, -60f, -30f, -15f, 0f, 15f, 30f, 60f, 80f };
 
@@ -148,51 +155,78 @@ public class CarAgent : Agent
     /// Wykonanie akcji zwróconych przez sieć neuronową.
     /// </summary>
     public override void OnActionReceived(ActionBuffers actionBuffers)
+{
+    float steer    = actionBuffers.ContinuousActions[0];
+    float throttle = actionBuffers.ContinuousActions[1];
+    _car.SetInputs(steer, throttle);
+
+    // ── Timer epizodu ──
+    _episodeTimer += Time.fixedDeltaTime;
+    if (_episodeTimer >= maxEpisodeTime)
     {
-        float steer = actionBuffers.ContinuousActions[0];      // -1..1
-        float throttle = actionBuffers.ContinuousActions[1];   // -1..1
+        AddReward(-0.1f);
+        EndEpisode();
+        return;
+    }
 
-        _car.SetInputs(steer, throttle);
-
-        // Timer epizodu
-        _episodeTimer += Time.fixedDeltaTime;
-        if (_episodeTimer >= maxEpisodeTime)
+    // ── Stuck detection ──
+    float distanceMoved = Vector3.Distance(transform.position, _lastPosition);
+    if (distanceMoved < 0.1f * Time.fixedDeltaTime * 10f)
+    {
+        _stuckTimer += Time.fixedDeltaTime;
+        if (_stuckTimer > STUCK_TIME)
         {
-            AddReward(-0.1f); // Mała kara za timeout
+            AddReward(-0.5f);
             EndEpisode();
             return;
         }
-
-        // Kara za stanie w miejscu
-        float distanceMoved = Vector3.Distance(transform.position, _lastPosition);
-        if (distanceMoved < 0.1f * Time.fixedDeltaTime * 10f)
-        {
-            _stuckTimer += Time.fixedDeltaTime;
-            if (_stuckTimer > STUCK_TIME)
-            {
-                AddReward(-0.5f);
-                EndEpisode();
-                return;
-            }
-        }
-        else
-        {
-            _stuckTimer = 0f;
-        }
-
-        // Mała kara za bycie idle (zachęca do ruchu)
-        AddReward(idlePenalty);
-
-        // Nagroda za ruch w stronę checkpointa
-        if (checkpointManager != null)
-        {
-            Vector3 cpPos = checkpointManager.GetCheckpointPosition(_nextCheckpointIndex);
-            float dot = Vector3.Dot(transform.forward, (cpPos - transform.position).normalized);
-            AddReward(dot * 0.001f * _car.GetNormalizedSpeed());
-        }
-
-        _lastPosition = transform.position;
     }
+    else
+    {
+        _stuckTimer = 0f;
+    }
+
+    // ── Nagroda za prędkość do przodu ──
+    // _rb nie istnieje w CarAgent — używamy transform i SpeedMs z CarController
+    float forwardSpeed = Vector3.Dot(transform.forward,
+                             transform.forward * _car.SpeedMs); // uproszczenie
+    // Lepiej: sprawdź czy jedziemy do przodu po throttle
+    if (throttle > 0f)
+    {
+        float speedNorm = _car.GetNormalizedSpeed();
+        AddReward(speedNorm * speedRewardScale);
+    }
+    else if (throttle < -0.1f && _car.SpeedMs < 0.5f)
+    {
+        AddReward(reversepenalty);
+    }
+
+    // ── Nagroda za kontrolowany drift ──
+    float slip = _car.LateralSlip;
+    if (slip > minDriftSlip && slip < maxDriftSlip)
+    {
+        bool isSteering = Mathf.Abs(steer) > 0.3f;
+        if (isSteering)
+        {
+            float driftQuality = 1f - Mathf.Abs(slip - (minDriftSlip + maxDriftSlip) * 0.5f)
+                                     / ((maxDriftSlip - minDriftSlip) * 0.5f);
+            AddReward(driftQuality * driftRewardScale);
+        }
+    }
+
+    // ── Nagroda za kierunek do checkpointa ──
+    if (checkpointManager != null)
+    {
+        Vector3 cpPos = checkpointManager.GetCheckpointPosition(_nextCheckpointIndex);
+        float dot = Vector3.Dot(transform.forward, (cpPos - transform.position).normalized);
+        AddReward(dot * 0.001f * _car.GetNormalizedSpeed());
+    }
+
+    // ── Idle penalty ──
+    AddReward(idlePenalty);
+
+    _lastPosition = transform.position;
+}
 
     /// <summary>
     /// Heurystyka dla trybu ręcznego (testowanie bez AI - klawisze WSAD/strzałki).

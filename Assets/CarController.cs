@@ -87,6 +87,23 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
+    public float LateralSlip
+{
+    get
+    {
+        // Pobieramy poślizg z obu tylnych kół i uśredniamy
+        // sideways to boczny poślizg opony – to właśnie chcemy mierzyć
+        WheelHit hitRL, hitRR;
+        float slip = 0f;
+        int count  = 0;
+
+        if (wheelRL.GetGroundHit(out hitRL)) { slip += Mathf.Abs(hitRL.sidewaysSlip); count++; }
+        if (wheelRR.GetGroundHit(out hitRR)) { slip += Mathf.Abs(hitRR.sidewaysSlip); count++; }
+
+        return count > 0 ? slip / count : 0f;
+    }
+}
+
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();

@@ -2,58 +2,22 @@
     "CarDriver": {
         "checkpoints": [
             {
-                "steps": 663252,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-663252.onnx",
-                "reward": 8.88321785926819,
-                "creation_time": 1777380216.1659389,
+                "steps": 42352,
+                "file_path": "results/CarRun01/CarDriver/CarDriver-42352.onnx",
+                "reward": -6.771048665046692,
+                "creation_time": 1777976275.3167229,
                 "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-663252.pt"
-                ]
-            },
-            {
-                "steps": 699936,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-699936.onnx",
-                "reward": 5.253090653816859,
-                "creation_time": 1777881788.945467,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-699936.pt"
-                ]
-            },
-            {
-                "steps": 797280,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-797280.onnx",
-                "reward": 19.881024049675982,
-                "creation_time": 1777882179.588026,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-797280.pt"
-                ]
-            },
-            {
-                "steps": 799952,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-799952.onnx",
-                "reward": -10.548203678234763,
-                "creation_time": 1777970847.006847,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-799952.pt"
-                ]
-            },
-            {
-                "steps": 823681,
-                "file_path": "results/CarRun01/CarDriver/CarDriver-823681.onnx",
-                "reward": -10.53664062221845,
-                "creation_time": 1777970949.5200179,
-                "auxillary_file_paths": [
-                    "results/CarRun01/CarDriver/CarDriver-823681.pt"
+                    "results/CarRun01/CarDriver/CarDriver-42352.pt"
                 ]
             }
         ],
         "final_checkpoint": {
-            "steps": 823681,
+            "steps": 42352,
             "file_path": "results/CarRun01/CarDriver.onnx",
-            "reward": -10.53664062221845,
-            "creation_time": 1777970949.5200179,
+            "reward": -6.771048665046692,
+            "creation_time": 1777976275.3167229,
             "auxillary_file_paths": [
-                "results/CarRun01/CarDriver/CarDriver-823681.pt"
+                "results/CarRun01/CarDriver/CarDriver-42352.pt"
             ]
         }
     },
