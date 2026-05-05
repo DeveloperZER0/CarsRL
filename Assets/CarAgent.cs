@@ -79,11 +79,16 @@ public class CarAgent : Agent
 
     if (checkpointManager != null)
     {
-        Transform spawn = checkpointManager.GetSpawnTransform();
-        _car.SetStartTransform(spawn.position, spawn.rotation); // ← DODAJ TO
+        // było: Transform spawn = checkpointManager.GetSpawnTransform();
+        // GetSpawnTransform() nigdy nie randomizuje – zwraca surowy Transform
+
+        Vector3 spawnPos    = checkpointManager.GetRandomizedSpawnPosition();
+        Quaternion spawnRot = checkpointManager.GetSpawnTransform().rotation;
+
+        _car.SetStartTransform(spawnPos, spawnRot);
     }
 
-    _car.ResetCar(); // teraz używa poprawnego spawn pointa
+    _car.ResetCar();
     _lastPosition = transform.position;
 }
 
