@@ -7,28 +7,43 @@ using UnityEngine;
 /// 1. Dodaj ten skrypt do GameObject bramki.
 /// 2. Dodaj BoxCollider z Is Trigger = true (szerokość trasy, niewidoczny).
 /// 3. Ustaw index (numer kolejny tej bramki na trasie).
-/// 4. Tag samochodu musi być "Agent" LUB przypisz layer do LayerMask.
+/// 4. Tag samochodu musi być "Agent" — na ROOT obiekcie auta.
 /// </summary>
 public class Checkpoint : MonoBehaviour
 {
     [Tooltip("Numer tego checkpointa na trasie (0 = pierwszy)")]
     public int checkpointIndex = 0;
 
-    [Tooltip("Tag obiektu samochodu")]
+    [Tooltip("Tag obiektu samochodu (sprawdzany na ROOT)")]
     public string carTag = "Agent";
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag(carTag)) return;
+        // Sprawdzamy tag na ROOT obiekcie (nie na colliderze dziecka/koła!)
+        // Bo tag "Agent" jest na głównym GameObject auta, a trigger wyzwala
+        // kolizję z WheelColliderem lub child BoxColliderem
+        Transform root = other.transform.root;
 
-        // Pobierz agenta z samochodu (może być na parent lub na tym samym obiekcie)
-        CarAgent agent = other.GetComponentInParent<CarAgent>();
+        bool tagOnSelf = other.CompareTag(carTag);
+        bool tagOnRoot = root != null && root.CompareTag(carTag);
+
+        if (!tagOnSelf && !tagOnRoot) return;
+
+        // Pobierz agenta — szukaj na root, potem na parent, potem na self
+        CarAgent agent = root.GetComponent<CarAgent>();
+        if (agent == null)
+            agent = other.GetComponentInParent<CarAgent>();
         if (agent == null)
             agent = other.GetComponent<CarAgent>();
 
         if (agent != null)
         {
             agent.OnCheckpointReached(checkpointIndex);
+        }
+        else
+        {
+            Debug.LogWarning($"[Checkpoint {checkpointIndex}] Obiekt '{other.name}' (root: '{root.name}') " +
+                             $"ma tag '{carTag}', ale nie ma CarAgent! Sprawdź hierarchię prefabu.");
         }
     }
 

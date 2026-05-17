@@ -37,77 +37,117 @@ public class CarController : MonoBehaviour
     public Transform meshRR;
 
     [Header("Wheel Mesh Offsets")]
-public Vector3 leftWheelOffset  = new Vector3(0f, 90f, 0f);
-public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
+    public Vector3 leftWheelOffset  = new Vector3(0f, 90f, 0f);
+    public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
     // ─── Engine ───────────────────────────────────────────────────────────────
 
     [Header("Engine")]
     [Tooltip("Maksymalny moment obrotowy silnika [Nm]")]
-    public float motorTorque = 1500f;
+    public float motorTorque = 3500f;
 
     [Tooltip("Moment hamowania [Nm]")]
-    public float brakeTorque = 3000f;
+    public float brakeTorque = 5000f;
 
-    [Tooltip("Hamowanie silnikiem gdy brak gazu [Nm]")]
-    public float engineBrakeTorque = 300f;
+    [Tooltip("Hamowanie silnikiem gdy brak gazu [Nm] — ZERO = auto toczy się bez oporu")]
+    public float engineBrakeTorque = 5f;
 
-    [Tooltip("Maksymalna prędkość [m/s]")]
-    public float maxSpeed = 15f;
+    [Tooltip("Maksymalna prędkość [m/s] (25 ≈ 90 km/h)")]
+    public float maxSpeed = 25f;
 
     // ─── Steering ─────────────────────────────────────────────────────────────
 
     [Header("Steering")]
     [Tooltip("Maksymalny kąt skrętu kół przednich [°]")]
-    public float maxSteeringAngle = 30f;
+    public float maxSteeringAngle = 35f;
 
-    [Tooltip("Prędkość interpolacji skrętu (płynność)")]
-    public float steeringSpeed = 5f;
+    [Tooltip("Redukcja kąta skrętu przy max prędkości (0 = brak redukcji, 1 = pełna)")]
+    [Range(0f, 0.8f)]
+    public float speedSteerReduction = 0.4f;
+
+    [Tooltip("Szybkość interpolacji skrętu — wysoka = responsywny")]
+    public float steeringSpeed = 25f;
 
     // ─── Physics ──────────────────────────────────────────────────────────────
 
     [Header("Physics")]
 
-    [Tooltip("Docisk do podłoża rośnie z prędkością [N/(m/s)]")]
-    public float downforcePerSpeed = 10f;
+    [Tooltip("Współczynnik docisku aerodynamicznego [N/(m/s)²]")]
+    public float downforceCoefficient = 8f;
+
+    [Tooltip("Maksymalna prędkość obrotowa [rad/s] (ogranicza przewracanie)")]
+    public float maxAngularVelocity = 4f;
+
+    [Tooltip("Wysokość spawnu nad podłożem (zapobiega klipowaniu)")]
+    public float spawnHeightOffset = 0.3f;
+
+    [Tooltip("Offset środka masy w dół — stabilizuje auto")]
+    public float centerOfMassYOffset = -0.5f;
 
     // ─── Internals ────────────────────────────────────────────────────────────
 
     private Rigidbody _rb;
     private float _currentSteer;
-    private float _currentThrottle;
-    private float _steerTarget;
+    private float _currentThrottle; // UWAGA: to jest surowy throttle z agenta, remapowany w ApplyMotor
+
     private Vector3 _startPosition;
     private Quaternion _startRotation;
 
     // Publiczne właściwości do odczytu (ML-Agents / UI)
     public float SpeedMs       => _rb.linearVelocity.magnitude;
     public float SpeedKmH      => SpeedMs * 3.6f;
-    public bool  IsGrounded    => wheelRL.isGrounded || wheelRR.isGrounded;
+    public bool  IsGrounded    => wheelRL.isGrounded || wheelRR.isGrounded || wheelFL.isGrounded || wheelFR.isGrounded;
+    /// <summary>Prędkość w kierunku przodu (ujemna = cofanie)</summary>
+    public float ForwardSpeed  => Vector3.Dot(_rb.linearVelocity, transform.forward);
+    /// <summary>Czy auto jest do góry nogami (dot up z world up < 0.1)</summary>
+    public bool  IsFlipped     => Vector3.Dot(transform.up, Vector3.up) < 0.1f;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     public float LateralSlip
-{
-    get
     {
-        // Pobieramy poślizg z obu tylnych kół i uśredniamy
-        // sideways to boczny poślizg opony – to właśnie chcemy mierzyć
-        WheelHit hitRL, hitRR;
-        float slip = 0f;
-        int count  = 0;
+        get
+        {
+            // Pobieramy poślizg z obu tylnych kół i uśredniamy
+            WheelHit hitRL, hitRR;
+            float slip = 0f;
+            int count  = 0;
 
-        if (wheelRL.GetGroundHit(out hitRL)) { slip += Mathf.Abs(hitRL.sidewaysSlip); count++; }
-        if (wheelRR.GetGroundHit(out hitRR)) { slip += Mathf.Abs(hitRR.sidewaysSlip); count++; }
+            if (wheelRL.GetGroundHit(out hitRL)) { slip += Mathf.Abs(hitRL.sidewaysSlip); count++; }
+            if (wheelRR.GetGroundHit(out hitRR)) { slip += Mathf.Abs(hitRR.sidewaysSlip); count++; }
 
-        return count > 0 ? slip / count : 0f;
+            return count > 0 ? slip / count : 0f;
+        }
     }
-}
+
+    public float GetSurfaceContactRatio(PhysicsMaterial material, string tag, LayerMask layers)
+    {
+        if (material == null && string.IsNullOrEmpty(tag) && layers.value == 0)
+        {
+            return 0f;
+        }
+
+        int hits = 0;
+        int matches = 0;
+
+        CountWheelSurface(wheelFL, material, tag, layers, ref hits, ref matches);
+        CountWheelSurface(wheelFR, material, tag, layers, ref hits, ref matches);
+        CountWheelSurface(wheelRL, material, tag, layers, ref hits, ref matches);
+        CountWheelSurface(wheelRR, material, tag, layers, ref hits, ref matches);
+
+        return hits > 0 ? (float)matches / hits : 0f;
+    }
 
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();
         _rb.interpolation  = RigidbodyInterpolation.Interpolate;
+        _rb.maxAngularVelocity = maxAngularVelocity;
+
+        // Obniżony środek masy — auto jest stabilniejsze, trudniej się przewraca
+        Vector3 com = _rb.centerOfMass;
+        com.y += centerOfMassYOffset;
+        _rb.centerOfMass = com;
 
         _startPosition = transform.position;
         _startRotation = transform.rotation;
@@ -118,6 +158,7 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
         ApplySteering();
         ApplyMotor();
         ApplyDownforce();
+        ClampSpeed();
         UpdateWheelMeshes();
     }
 
@@ -125,9 +166,12 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
     /// <summary>
     /// Ustawia wejścia sterowania (wywoływane przez CarAgent).
+    /// WAŻNE: throttle jest remapowany w ApplyMotor!
+    ///   Agent wysyła [-1, +1], ale jest to traktowane jako:
+    ///     [-1, 0) = hamulec (proporcjonalny)
+    ///     [0, +1] = gaz (proporcjonalny)
+    ///   Agent ZAWSZE jedzie do przodu, nie ma wstecznego.
     /// </summary>
-    /// <param name="steer">-1 = lewo, +1 = prawo</param>
-    /// <param name="throttle">-1 = hamulec/wsteczny, +1 = gaz</param>
     public void SetInputs(float steer, float throttle)
     {
         _currentSteer    = Mathf.Clamp(steer,    -1f, 1f);
@@ -141,9 +185,12 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
         // Wyzeruj siły
         _rb.linearVelocity  = Vector3.zero;
         _rb.angularVelocity = Vector3.zero;
-        _rb.position        = _startPosition;
-        _rb.rotation        = _startRotation;
-        transform.SetPositionAndRotation(_startPosition, _startRotation);
+
+        // Spawn lekko nad podłożem — zapobiega klipowaniu z gruntem
+        Vector3 safePos = _startPosition + Vector3.up * spawnHeightOffset;
+        _rb.position = safePos;
+        _rb.rotation = _startRotation;
+        transform.SetPositionAndRotation(safePos, _startRotation);
 
         // Wyzeruj WheelCollidery
         foreach (var wheel in new[] { wheelFL, wheelFR, wheelRL, wheelRR })
@@ -155,7 +202,6 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
         _currentSteer    = 0f;
         _currentThrottle = 0f;
-        _steerTarget     = 0f;
     }
 
     public void SetStartTransform(Vector3 pos, Quaternion rot)
@@ -168,56 +214,43 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
     private void ApplyMotor()
     {
-        float forwardSpeed = Vector3.Dot(_rb.linearVelocity, transform.forward);
+        // ═══════════════════════════════════════════════════════════════════
+        // REMAPOWANIE THROTTLE:
+        //   Agent wysyła _currentThrottle w zakresie [-1, +1]
+        //   Mapujemy na:
+        //     gas    = max(0, _currentThrottle)     → [0, 1]
+        //     brake  = max(0, -_currentThrottle)    → [0, 1]
+        //   Dzięki temu neutralna pozycja (0) = auto toczy się bez oporu
+        //   a agent musi AKTYWNIE hamować (wartości ujemne)
+        // ═══════════════════════════════════════════════════════════════════
 
-        if (_currentThrottle > 0f)
+        float gas   = Mathf.Max(0f, _currentThrottle);
+        float brake = Mathf.Max(0f, -_currentThrottle);
+
+        if (gas > 0.01f)
         {
             // ── Przyspieszanie ──
-            if (SpeedMs < maxSpeed)
-            {
-                // Krzywa momentu: pełna siła do 50% prędkości, potem spada
-                float speedRatio  = Mathf.Clamp01(SpeedMs / maxSpeed);
-                float torqueCurve = Mathf.Pow(1f - speedRatio, 1.5f);
-                float torque      = _currentThrottle * motorTorque * torqueCurve;
+            float speedRatio  = Mathf.Clamp01(Mathf.Max(ForwardSpeed, 0f) / maxSpeed);
+            float torqueCurve = Mathf.Lerp(1f, 0.1f, speedRatio * speedRatio);
+            float torque      = gas * motorTorque * torqueCurve;
 
-                // Napęd na wszystkie koła (4WD)
-                // Zmień na wheelRL/RR jeśli chcesz tylnonapędowe (RWD → więcej driftu!)
-                wheelFL.motorTorque = torque;
-                wheelFR.motorTorque = torque;
-                wheelRL.motorTorque = torque;
-                wheelRR.motorTorque = torque;
-            }
-            else
-            {
-                // Osiągnięto maxSpeed – brak momentu
-                SetMotorTorque(0f);
-            }
+            // Napęd na wszystkie koła (4WD)
+            wheelFL.motorTorque = torque;
+            wheelFR.motorTorque = torque;
+            wheelRL.motorTorque = torque;
+            wheelRR.motorTorque = torque;
 
-            // Brak hamowania
             SetBrakeTorque(0f);
         }
-        else if (_currentThrottle < 0f)
+        else if (brake > 0.01f)
         {
+            // ── Aktywne hamowanie ──
             SetMotorTorque(0f);
-
-            if (forwardSpeed > 0.5f)
-            {
-                // ── Hamowanie ──
-                SetBrakeTorque(Mathf.Abs(_currentThrottle) * brakeTorque);
-            }
-            else
-            {
-                // ── Wsteczny (tylko tylne koła) ──
-                SetBrakeTorque(0f);
-                wheelRL.motorTorque = _currentThrottle * motorTorque * 0.5f;
-                wheelRR.motorTorque = _currentThrottle * motorTorque * 0.5f;
-                wheelFL.motorTorque = 0f;
-                wheelFR.motorTorque = 0f;
-            }
+            SetBrakeTorque(brake * brakeTorque);
         }
         else
         {
-            // ── Hamowanie silnikiem ──
+            // ── Neutralna — minimalne hamowanie, auto się toczy ──
             SetMotorTorque(0f);
             SetBrakeTorque(engineBrakeTorque);
         }
@@ -225,9 +258,14 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
 
     private void ApplySteering()
     {
-        // Płynna interpolacja skrętu (bez szarpania)
-        _steerTarget = _currentSteer * maxSteeringAngle;
-        float smoothed = Mathf.Lerp(wheelFL.steerAngle, _steerTarget,
+        // Redukcja kąta skrętu przy wyższej prędkości — stabilność
+        float speedFactor = Mathf.Clamp01(SpeedMs / maxSpeed);
+        float effectiveMaxAngle = maxSteeringAngle * (1f - speedFactor * speedSteerReduction);
+
+        float steerTarget = _currentSteer * effectiveMaxAngle;
+
+        // Szybka, responsywna interpolacja
+        float smoothed = Mathf.Lerp(wheelFL.steerAngle, steerTarget,
                                     steeringSpeed * Time.fixedDeltaTime);
 
         wheelFL.steerAngle = smoothed;
@@ -237,8 +275,19 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
     private void ApplyDownforce()
     {
         // Docisk rośnie kwadratowo z prędkością (jak w prawdziwym aucie)
-        float force = downforcePerSpeed * SpeedMs * SpeedMs;
+        float force = downforceCoefficient * SpeedMs * SpeedMs;
         _rb.AddForce(-transform.up * force, ForceMode.Force);
+    }
+
+    /// <summary>
+    /// Twardy limit prędkości — zapobiega nieskończonemu przyspieszaniu
+    /// </summary>
+    private void ClampSpeed()
+    {
+        if (SpeedMs > maxSpeed * 1.05f)
+        {
+            _rb.linearVelocity = _rb.linearVelocity.normalized * maxSpeed;
+        }
     }
 
     /// <summary>
@@ -253,11 +302,43 @@ public Vector3 rightWheelOffset = new Vector3(0f, -90f, 0f);
     }
 
     private void UpdateSingleMesh(WheelCollider col, Transform mesh, Vector3 rotationOffset)
-{
-    if (mesh == null) return;
-    col.GetWorldPose(out Vector3 pos, out Quaternion rot);
-    mesh.SetPositionAndRotation(pos, rot * Quaternion.Euler(rotationOffset));
-}
+    {
+        if (mesh == null) return;
+        col.GetWorldPose(out Vector3 pos, out Quaternion rot);
+        mesh.SetPositionAndRotation(pos, rot * Quaternion.Euler(rotationOffset));
+    }
+
+    private void CountWheelSurface(
+        WheelCollider wheel,
+        PhysicsMaterial material,
+        string tag,
+        LayerMask layers,
+        ref int hits,
+        ref int matches)
+    {
+        if (wheel == null) return;
+
+        if (wheel.GetGroundHit(out WheelHit hit))
+        {
+            hits++;
+            if (IsSurfaceMatch(hit, material, tag, layers))
+            {
+                matches++;
+            }
+        }
+    }
+
+    private bool IsSurfaceMatch(WheelHit hit, PhysicsMaterial material, string tag, LayerMask layers)
+    {
+        Collider col = hit.collider;
+        if (col == null) return false;
+
+        if (material != null && col.sharedMaterial == material) return true;
+        if (!string.IsNullOrEmpty(tag) && col.CompareTag(tag)) return true;
+        if (layers.value != 0 && (layers.value & (1 << col.gameObject.layer)) != 0) return true;
+
+        return false;
+    }
 
     private void SetMotorTorque(float torque)
     {
