@@ -31,4 +31,4 @@ behaviors:
     checkpoint_interval: 200000
     summary_freq: 10000
     keep_checkpoints: 10
-    threaded: true
+    threaded: false
