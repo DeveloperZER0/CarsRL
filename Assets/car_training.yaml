@@ -8,7 +8,6 @@ behaviors:
       num_epoch: 4
       epsilon: 0.2
       lambd: 0.95
-      # Wysokie beta = dużo eksploracji — kluczowe żeby nie utknąć w "staniu"
       beta: 3.0e-2
       learning_rate_schedule: linear
       beta_schedule: linear
@@ -25,7 +24,6 @@ behaviors:
         gamma: 0.99
         strength: 0.02
         encoding_size: 128
-    # Krótki time_horizon — epizody kończą się szybko
     time_horizon: 256
     max_steps: 10000000
     checkpoint_interval: 200000
