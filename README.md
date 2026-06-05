@@ -256,8 +256,10 @@ Poniższe zrzuty ekranu pokazują tory z większej odległości, dzięki czemu w
 
 - **Tor główny - widok z oddalenia:**
 <img width="898" height="699" alt="tor_glowny" src="https://github.com/user-attachments/assets/9fdf78bc-263c-4720-a8e9-d80d44f77cad" />
+
 - **Tor nr 2 z lodem - widok z oddalenia:**
 <img width="904" height="818" alt="tor_2" src="https://github.com/user-attachments/assets/c374d436-a8c8-42fd-852d-a97eacbd57e1" />
+
 - **Tor nr 3 z lodem - widok z oddalenia:**
 <img width="1468" height="785" alt="tor_3" src="https://github.com/user-attachments/assets/4f29fb5f-b351-4d46-825d-5fc1e12f12cf" />
 
@@ -419,12 +421,16 @@ tensorboard --logdir results/
 
 - **Cumulative Reward** - czy agent faktycznie uczy się lepszej jazdy,
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 39 26" src="https://github.com/user-attachments/assets/43fb8144-af5f-41e6-8ab1-fe5c2c1851fb" />
+
 - **Episode Length** - czy epizody stają się dłuższe i bardziej stabilne,
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 39 46" src="https://github.com/user-attachments/assets/511e3158-ed19-4fd2-b9e6-f68bb843987f" />
+
 - **Policy Loss** - jak zachowuje się funkcja celu polityki,
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 12" src="https://github.com/user-attachments/assets/d58f8940-8bc0-4dda-9231-a72382c8d08a" />
+
 - **Value Loss** - jakość estymacji funkcji wartości,
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 26" src="https://github.com/user-attachments/assets/48169b61-56e3-4c09-9477-0e280fae0986" />
+
 - **Entropy** - stopień eksploracji.
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 43" src="https://github.com/user-attachments/assets/f5aa5ac4-d0a1-4d31-a718-b06800d7abe5" />
 
