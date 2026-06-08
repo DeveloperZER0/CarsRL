@@ -350,7 +350,8 @@ Agent bardzo szybko odkrywa, że:
 W efekcie uczy się zachowania podobnego do ludzkiego kierowcy: przyspiesza na prostych, zwalnia przed zakrętami i unika przeszkód.
 
 ## 3.6 Użycie AI w projekcie
-W projekcie użyto generatywnego AI w celach naprawy błędów w kodzie i w środowisku Unity. Wykorzystane zostało również przy doborze hiperparametrów i parametrów Reward/Penalty
+W projekcie użyto generatywnego AI w celach naprawy błędów w kodzie i w środowisku Unity. Wykorzystane zostało również przy doborze hiperparametrów i parametrów Reward/Penalty.
+Wykorzystane modele: Claude Opus 4.7 | Gemma 4 31b:cloud | Qwen3 Coder:local
 
 ---
 
