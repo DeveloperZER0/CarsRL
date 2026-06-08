@@ -349,6 +349,9 @@ Agent bardzo szybko odkrywa, że:
 
 W efekcie uczy się zachowania podobnego do ludzkiego kierowcy: przyspiesza na prostych, zwalnia przed zakrętami i unika przeszkód.
 
+## 3.6 Użycie AI w projekcie
+W projekcie użyto generatywnego AI w celach naprawy błędów w kodzie i w środowisku Unity. Wykorzystane zostało również przy doborze hiperparametrów i parametrów Reward/Penalty
+
 ---
 
 # 4. Konfiguracja i przebieg treningu
@@ -420,16 +423,16 @@ tensorboard --logdir results/
 ## 4.3 Wykresy uczenia
 
 - **Cumulative Reward** - czy agent faktycznie uczy się lepszej jazdy,
-<img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 39 26" src="https://github.com/user-attachments/assets/43fb8144-af5f-41e6-8ab1-fe5c2c1851fb" />
+<img width="1140" height="504" alt="obraz" src="https://github.com/user-attachments/assets/a0a9db73-7470-4f74-89cc-1bcc81edec0f" />
 
 - **Episode Length** - czy epizody stają się dłuższe i bardziej stabilne,
-<img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 39 46" src="https://github.com/user-attachments/assets/511e3158-ed19-4fd2-b9e6-f68bb843987f" />
+<img width="1140" height="504" alt="obraz" src="https://github.com/user-attachments/assets/46f508a0-b637-41e7-bbc9-93ad4bf95541" />
 
 - **Policy Loss** - jak zachowuje się funkcja celu polityki,
-<img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 12" src="https://github.com/user-attachments/assets/d58f8940-8bc0-4dda-9231-a72382c8d08a" />
+<img width="1140" height="453" alt="obraz" src="https://github.com/user-attachments/assets/8a38b4cf-e284-4c39-998a-3070f49cfba7" />
 
 - **Value Loss** - jakość estymacji funkcji wartości,
-<img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 26" src="https://github.com/user-attachments/assets/48169b61-56e3-4c09-9477-0e280fae0986" />
+<img width="1140" height="453" alt="obraz" src="https://github.com/user-attachments/assets/0a35ac6b-be7c-4596-8d74-c9b6b4223a9a" />
 
 - **Entropy** - stopień eksploracji.
 <img width="1134" height="469" alt="Zrzut ekranu 2026-06-5 o 12 40 43" src="https://github.com/user-attachments/assets/f5aa5ac4-d0a1-4d31-a718-b06800d7abe5" />
